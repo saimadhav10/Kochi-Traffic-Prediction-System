@@ -2,6 +2,25 @@
 
 Checked October 29, 2026. Local configuration, Cloudflare CLI authentication, and technical TomTom capability checks are working. Account-specific free allowances and billing/overage settings still require confirmation in the account dashboards.
 
+## Live map preview
+
+```powershell
+rtk proxy npm.cmd run typecheck
+rtk proxy npm.cmd test
+rtk proxy npm.cmd run build
+rtk proxy npm.cmd run dev
+```
+
+Open `http://127.0.0.1:8787`. The light map includes current traffic colors, five area shortcuts, selectable roads, current/free-flow speeds, provider confidence, fetch time in IST, a traffic-layer switch, and refresh controls. Traffic refreshes on a 15-minute cadence while visible; selected roads are fetched on demand. Missing observations are shown as unavailable.
+
+The Node preview binds only to `127.0.0.1` and calls the same Web-standard API handler used by the Cloudflare Worker adapter. Only the server reads `.env`; the browser calls restricted `/api/tiles/...` and `/api/flow` endpoints on the same origin. Requests outside the operating bounds, unexpected parameters, arbitrary proxy targets, invalid tiles, and non-GET API methods are rejected. Provider response fields and error bodies are not passed through wholesale. Browser responses contain no credentials.
+
+Provider access is explicitly disabled in the production adapter until durable account-wide quotas exist; changing a Host header cannot enable it. The Node preview grants local access explicitly and has conservative per-process request and queue ceilings. These local ceilings are not production quota enforcement.
+
+The local Cloudflare `workerd` runtime rejected outbound provider fetches on this machine while Node's verified HTTPS requests succeeded. No certificate checks were disabled. Use `npm run dev:worker` to investigate the Cloudflare runtime separately after building; it does not enable upstream access. The Node preview supports UI verification, but Cloudflare production networking must still be tested before release.
+
+MapLibre's rendering worker is bundled as a same-origin asset, and the page's content security policy restricts connections and scripts to this application. The production build emits a MapLibre bundle-size advisory (about 297 kB gzip for the main JavaScript bundle); the build succeeds.
+
 ## Local setup
 
 Use Node.js 22.12 or newer. Install the pinned tooling, then create the ignored local environment file without overwriting an existing one:
@@ -43,7 +62,7 @@ The normalized report is written to ignored `provider-check.local.json`. It reco
 
 | Check | Result |
 | --- | --- |
-| Configuration and provider validation tests | 11 passed |
+| Configuration, provider, and server-boundary tests | 17 passed |
 | Traffic samples: central Kochi, Kakkanad, Kalamassery, Aluva, Tripunithura | 5 passed |
 | Basemap and traffic raster tiles | 2 passed |
 | Kochi address geocoding | Passed |
@@ -52,6 +71,8 @@ The normalized report is written to ignored `provider-check.local.json`. It reco
 | Cloudflare CLI identity | Authenticated |
 | Current TomTom key in non-ignored files and fresh Git history | No matches found |
 | Local secret file ignore rules | Verified |
+| Browser build scan for the current key | No matches found |
+| Desktop/mobile area navigation, traffic toggle and live road display | Inspected in browser |
 
 The first concurrent live check encountered two HTTP 429 routing responses. The tool now runs sequentially with a minimum gap between requests; the subsequent full 16-request run passed. This does not guarantee future availability or remove account quota limits.
 
@@ -61,7 +82,7 @@ The current credential is kept in a local file rather than source or browser cod
 
 - Confirm actual TomTom product allowances, request charging, reset cycle, and billing/overage behavior, and confirm Cloudflare Workers Free access.
 - Check provider caching permissions before enabling caching or retaining historical observations.
-- Add the light map, selected-road details, routes, durable quota enforcement, and deployment checks from [PLAN.md](PLAN.md).
+- Add routes, durable quota enforcement, and deployment checks from [PLAN.md](PLAN.md). The map and selected-road details are implemented locally.
 
 ## Tool references
 

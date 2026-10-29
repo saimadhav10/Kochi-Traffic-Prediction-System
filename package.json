@@ -9,15 +9,24 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "verify:provider": "node scripts/verify-provider.mjs",
-    "test": "node --test",
+    "test": "node --experimental-strip-types --test",
+    "dev": "node --experimental-strip-types scripts/dev.mjs",
+    "dev:worker": "node scripts/worker.mjs",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "cloudflare:login": "node scripts/cloudflare.mjs login",
     "cloudflare:status": "node scripts/cloudflare.mjs whoami"
   },
   "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
     "wrangler": "4.155.0"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
     "workerd@1.20261023.1": true
+  },
+  "dependencies": {
+    "maplibre-gl": "6.16.0"
   }
 }

@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "kochi-traffic",
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-10-23",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "secrets": { "required": ["TOMTOM_API_KEY"] },
+  "observability": { "enabled": false }
+}

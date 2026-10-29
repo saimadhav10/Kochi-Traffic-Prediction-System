@@ -3,7 +3,7 @@
 Date: October 29, 2026 (Asia/Kolkata).
 Repository: [saimadhav10/Kochi-Traffic-Prediction-System](https://github.com/saimadhav10/Kochi-Traffic-Prediction-System).
 Working branch: `main`.
-Status: local configuration tooling, Cloudflare CLI access, and technical provider checks are implemented. All 16 live sample checks and 11 automated tests passed. Account-specific free allowances and caching permissions remain unverified. See [SETUP.md](SETUP.md). The public map and routing interface are not implemented yet.
+Status: local configuration, provider checks, and the live map/road-details milestone are implemented. Desktop and mobile preview interactions have been inspected; 17 automated tests pass. The current key is absent from the browser build. Routing, durable quotas, account-specific free allowances, provider caching permissions, and production deployment verification remain outstanding. See [SETUP.md](SETUP.md).
 
 ## Product flow
 
