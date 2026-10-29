@@ -1,0 +1,17 @@
+# Local credentials and configuration
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Generated files
+node_modules/
+dist/
+.wrangler/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.local.json
