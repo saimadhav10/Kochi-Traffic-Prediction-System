@@ -1,0 +1,23 @@
+{
+  "name": "kochi-traffic-prediction-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "verify:provider": "node scripts/verify-provider.mjs",
+    "test": "node --test",
+    "cloudflare:login": "node scripts/cloudflare.mjs login",
+    "cloudflare:status": "node scripts/cloudflare.mjs whoami"
+  },
+  "devDependencies": {
+    "wrangler": "4.155.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261023.1": true
+  }
+}
