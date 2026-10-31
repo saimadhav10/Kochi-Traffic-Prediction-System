@@ -62,7 +62,7 @@ The normalized report is written to ignored `provider-check.local.json`. It reco
 
 | Check | Result |
 | --- | --- |
-| Configuration, provider, and server-boundary tests | 17 passed |
+| Configuration, provider, server-boundary, and journey tests | 23 passed |
 | Traffic samples: central Kochi, Kakkanad, Kalamassery, Aluva, Tripunithura | 5 passed |
 | Basemap and traffic raster tiles | 2 passed |
 | Kochi address geocoding | Passed |
@@ -73,6 +73,8 @@ The normalized report is written to ignored `provider-check.local.json`. It reco
 | Local secret file ignore rules | Verified |
 | Browser build scan for the current key | No matches found |
 | Desktop/mobile area navigation, traffic toggle and live road display | Inspected in browser |
+| Address search, map pins, alternatives, and both vehicle/departure combinations | Verified with live responses in browser |
+| Mobile journey layout, stale-result clearing, and Escape cancellation | Inspected in browser |
 
 The first concurrent live check encountered two HTTP 429 routing responses. The tool now runs sequentially with a minimum gap between requests; the subsequent full 16-request run passed. This does not guarantee future availability or remove account quota limits.
 
@@ -82,7 +84,17 @@ The current credential is kept in a local file rather than source or browser cod
 
 - Confirm actual TomTom product allowances, request charging, reset cycle, and billing/overage behavior, and confirm Cloudflare Workers Free access.
 - Check provider caching permissions before enabling caching or retaining historical observations.
-- Add routes, durable quota enforcement, and deployment checks from [PLAN.md](PLAN.md). The map and selected-road details are implemented locally.
+- Add durable quota enforcement and deployment checks from [PLAN.md](PLAN.md). Map, selected-road details, and routing are implemented locally.
+
+## Using the route planner
+
+Open **Plan a route**. Search a start/destination address and select a matching result, or use each **Choose on map** control. Search runs only on explicit submission; results cover addresses/areas rather than business POIs. Both endpoints must be within wider Kochi. **Use my location** requests device permission only when clicked and does not store travel history; the route request sends selected coordinates to TomTom through the server. Device-permission success was not exercised during automated browser inspection.
+
+Choose **Car** or **Two-wheeler**, then **Leave now** or **In one hour** and click **Find routes**. The server computes the one-hour departure when the request is submitted and verifies the provider's returned timestamp. Times display in IST. Up to two alternatives appear when returned; selecting one highlights its geometry. Editing the trip clears previous estimates and cancels pending browser requests. Refreshing the traffic layer does not recalculate a journey; use **Find routes** for a fresh estimate.
+
+Two-wheeler requests use TomTom's motorcycle mode. The panel discloses its experimental restriction coverage. Routes without confirmation of the selected vehicle mode are rejected rather than silently presented as valid. Future journey estimates use the provider's traffic-aware routing, not a custom forecasting model.
+
+The loopback preview has conservative process-local caps of 40 geocoding and 40 routing requests per server session, with sequential pacing per product. These are development controls; public upstream access remains disabled until durable quota enforcement is complete.
 
 ## Tool references
 

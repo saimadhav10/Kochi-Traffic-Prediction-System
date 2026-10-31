@@ -3,7 +3,7 @@
 Date: October 29, 2026 (Asia/Kolkata).
 Repository: [saimadhav10/Kochi-Traffic-Prediction-System](https://github.com/saimadhav10/Kochi-Traffic-Prediction-System).
 Working branch: `main`.
-Status: local configuration, provider checks, and the live map/road-details milestone are implemented. Desktop and mobile preview interactions have been inspected; 17 automated tests pass. The current key is absent from the browser build. Routing, durable quotas, account-specific free allowances, provider caching permissions, and production deployment verification remain outstanding. See [SETUP.md](SETUP.md).
+Status: local configuration, provider checks, live map/road details, and route planning are implemented. Desktop and mobile preview interactions have been inspected; 23 automated tests pass. Routes support address searches, map pins, car/motorcycle modes, alternatives, and now/+1-hour estimates. The current key is absent from the browser build. Durable quotas, account-specific free allowances, provider caching permissions, and production deployment verification remain outstanding. See [SETUP.md](SETUP.md).
 
 ## Product flow
 

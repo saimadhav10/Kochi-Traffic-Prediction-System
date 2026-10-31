@@ -13,7 +13,7 @@ A fresh public, non-commercial traffic project for wider Kochi, including Kakkan
 
 ## Project status
 
-Requirements and the implementation plan are retained. The application is being built from scratch in this repository on `main`. The live map, traffic layer, area shortcuts, and selected-road speeds now work in a local preview. Route planning, durable account-wide quotas, and public deployment are the next milestones.
+The live map, traffic layer, area shortcuts, selected-road speeds, and route planner work in the local preview. Choose addresses or map points, select a car or two-wheeler, and compare available routes for departure now or in one hour. Routes include distance, duration, and departure/arrival times in IST. Optional device location is requested only when selected. Durable account-wide quotas and public deployment are the next milestones.
 
 - [Requirements](REQUIREMENTS.md)
 - [Implementation plan](PLAN.md)

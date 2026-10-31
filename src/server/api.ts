@@ -1,15 +1,16 @@
-import { containsPoint, validTile, type RoadDetails } from '../shared/region.ts';
+import { bounds, containsPoint, validTile, type RoadDetails } from '../shared/region.ts';
+import { normalizeAddresses, normalizeRoutes } from './journey.ts';
 
 export interface Env {
   TOMTOM_API_KEY?: string;
   ASSETS: { fetch(request: Request): Promise<Response> };
 }
-type Product = 'base' | 'traffic' | 'flow';
+type Product = 'base' | 'traffic' | 'flow' | 'geocode' | 'route';
 type Fetcher = typeof fetch;
 
 const guards = new Map<Product, { tail: Promise<void>; lastStart: number; calls: number; queued: number }>();
-const limits: Record<Product, number> = { base: 1200, traffic: 1200, flow: 80 };
-const delays: Record<Product, number> = { base: 180, traffic: 250, flow: 1100 };
+const limits: Record<Product, number> = { base: 1200, traffic: 1200, flow: 80, geocode: 40, route: 40 };
+const delays: Record<Product, number> = { base: 180, traffic: 250, flow: 1100, geocode: 1100, route: 1100 };
 
 export class ApiError extends Error {
   code: string;
@@ -56,6 +57,41 @@ function checkProviderStatus(response: Response): void {
   if (!response.ok) throw new ApiError(`PROVIDER_HTTP_${response.status}`, 503);
 }
 
+async function readJson(response: Response): Promise<unknown> {
+  // Bound provider bodies and never forward credential-bearing error text.
+  if (!response.body) throw new ApiError('PROVIDER_INVALID_RESPONSE', 503);
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 4_000_000) { await reader.cancel(); throw new Error(); }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch { throw new ApiError('PROVIDER_INVALID_RESPONSE', 503); }
+}
+
+function validateParams(url: URL, allowed: string[]) {
+  if ([...url.searchParams.keys()].some(name => !allowed.includes(name) || url.searchParams.getAll(name).length !== 1)) {
+    throw new ApiError('INVALID_REQUEST', 400);
+  }
+}
+
+function pointParam(url: URL, name: string): [number, number] {
+  const raw = url.searchParams.get(name);
+  if (!raw || !/^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/.test(raw)) throw new ApiError('INVALID_REQUEST', 400);
+  const [lat, lon] = raw.split(',').map(Number);
+  if (!containsPoint(lat, lon)) throw new ApiError('OUTSIDE_KOCHI', 400);
+  return [lat, lon];
+}
+
 export function normalizeRoad(payload: unknown, fetchedAt: string): RoadDetails {
   const flow = (payload as { flowSegmentData?: Record<string, unknown> })?.flowSegmentData;
   const speed = flow?.currentSpeed, free = flow?.freeFlowSpeed, confidence = flow?.confidence;
@@ -85,6 +121,40 @@ export async function handleApi(request: Request, env: Env, fetcher: Fetcher = f
     if (!localAccess) throw new ApiError('PUBLIC_ACCESS_NOT_READY', 503);
     if (!env.TOMTOM_API_KEY?.trim()) throw new ApiError('TRAFFIC_UNAVAILABLE', 503);
 
+    if (url.pathname === '/api/geocode') {
+      validateParams(url, ['q']);
+      const query = url.searchParams.get('q')?.trim();
+      if (!query || query.length < 3 || query.length > 160 || /[\u0000-\u001f\u007f]/.test(query)) throw new ApiError('INVALID_REQUEST', 400);
+      const response = await provider(`/search/2/geocode/${encodeURIComponent(query)}.json`, {
+        countrySet: 'IN', limit: '10', topLeft: `${bounds.north},${bounds.west}`, btmRight: `${bounds.south},${bounds.east}`,
+      }, 'geocode', env, fetcher);
+      checkProviderStatus(response);
+      const payload = await readJson(response);
+      try { return json({ results: normalizeAddresses(payload) }); }
+      catch { throw new ApiError('PROVIDER_INVALID_RESPONSE', 503); }
+    }
+
+    if (url.pathname === '/api/routes') {
+      validateParams(url, ['start', 'end', 'vehicle', 'departure']);
+      const start = pointParam(url, 'start'), end = pointParam(url, 'end');
+      if (Math.hypot(start[0] - end[0], start[1] - end[1]) < 0.0001) throw new ApiError('POINTS_TOO_CLOSE', 400);
+      const vehicle = url.searchParams.get('vehicle'), departure = url.searchParams.get('departure');
+      if ((vehicle !== 'car' && vehicle !== 'motorcycle') || (departure !== 'now' && departure !== 'hour')) throw new ApiError('INVALID_REQUEST', 400);
+      const requestedTime = Date.now() + (departure === 'hour' ? 3_600_000 : 0);
+      const response = await provider(`/routing/1/calculateRoute/${start.join(',')}:${end.join(',')}/json`, {
+        travelMode: vehicle, traffic: 'true', departAt: departure === 'now' ? 'now' : new Date(requestedTime).toISOString(),
+        maxAlternatives: '2', routeType: 'fastest', sectionType: 'travelMode', routeRepresentation: 'polyline',
+      }, 'route', env, fetcher);
+      if ([400, 404].includes(response.status)) throw new ApiError('NO_ROUTE', 404);
+      checkProviderStatus(response);
+      const payload = await readJson(response);
+      try { return json({ routes: normalizeRoutes(payload, vehicle, requestedTime, departure === 'now' ? 120_000 : 2_000), vehicle, departure, fetchedAt: new Date().toISOString() }); }
+      catch (error) {
+        const code = error instanceof Error && ['NO_ROUTE', 'VEHICLE_UNAVAILABLE'].includes(error.message) ? error.message : 'PROVIDER_INVALID_RESPONSE';
+        throw new ApiError(code, code === 'PROVIDER_INVALID_RESPONSE' ? 503 : 404);
+      }
+    }
+
     if (url.pathname === '/api/flow') {
       if ([...url.searchParams.keys()].some(name => !['lat', 'lon'].includes(name))) throw new ApiError('INVALID_REQUEST', 400);
       const lat = Number(url.searchParams.get('lat')), lon = Number(url.searchParams.get('lon'));
@@ -93,8 +163,7 @@ export async function handleApi(request: Request, env: Env, fetcher: Fetcher = f
         point: `${lat},${lon}`, unit: 'kmph',
       }, 'flow', env, fetcher);
       checkProviderStatus(response);
-      let payload: unknown;
-      try { payload = await response.json(); } catch { throw new ApiError('PROVIDER_INVALID_RESPONSE', 503); }
+      const payload = await readJson(response);
       return json(normalizeRoad(payload, new Date().toISOString()));
     }
 

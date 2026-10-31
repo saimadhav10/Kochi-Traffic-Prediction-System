@@ -4,13 +4,14 @@ import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
 import { bounds, containsPoint, places, type RoadDetails } from '../shared/region.ts';
+import { journeyPanel, setupJourney } from './journey.ts';
 
 const arrow = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const refreshIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 10a8 8 0 1 0-2 8M20 4v6h-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const pin = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 10c0 5-7 10-7 10S5 15 5 10a7 7 0 1 1 14 0Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.6"/></svg>';
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <a class="skip-link" href="#road-panel">Skip to road details</a>
+  <a class="skip-link" href="#plan-tab">Skip to map tools</a>
   <header class="app-header">
     <a class="brand" href="/" aria-label="Kochi Traffic home"><img src="/favicon.svg" alt="" width="38" height="38"/><span>Kochi<span class="brand-light">traffic</span><span class="brand-dot">.</span></span></a>
     <div class="header-context"><span class="context-dot"></span> A clearer view of your city</div>
@@ -20,7 +21,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <div id="map" role="region" aria-label="Interactive map of wider Kochi. Use the area buttons to select a road with the keyboard."></div>
     <div class="map-grain" aria-hidden="true"></div>
     <aside class="explorer" aria-label="Traffic explorer">
-      <section class="intro-card">
+      ${journeyPanel}
+      <section class="intro-card" data-explore>
         <div class="eyebrow"><span class="tiny-line"></span> THE CITY, IN MOTION</div>
         <h1>Know the road ahead<span class="accent">.</span></h1>
         <p class="intro-copy">A live look at traffic across Kochi. Find a road. See how it’s moving.</p>
@@ -28,14 +30,14 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
         <div class="area-heading">EXPLORE AN AREA</div>
         <div id="places" class="places">${places.map((place, index) => `<button class="place${index === 0 ? ' active' : ''}" data-place="${index}" aria-pressed="${index === 0}"><span>${place.name}</span>${arrow}</button>`).join('')}</div>
       </section>
-      <section id="road-panel" class="road-card" tabindex="-1" aria-labelledby="road-heading">
+      <section id="road-panel" class="road-card" data-explore tabindex="-1" aria-labelledby="road-heading">
         <div class="road-top"><span class="eyebrow">ROAD SNAPSHOT</span><span id="road-state" class="state-pill loading">Loading</span></div>
         <h2 id="road-heading">Central Kochi</h2>
         <p id="road-context" class="road-context">Matching the nearest observed road…</p>
         <div id="road-content" class="road-content"><div class="skeleton"></div><div class="skeleton short"></div></div>
         <p id="road-message" class="road-message" role="status" aria-live="polite">Loading current road conditions.</p>
       </section>
-      <p class="explorer-footnote">Select any road on the map to take a closer look.</p>
+      <p class="explorer-footnote" data-explore>Select any road on the map to take a closer look.</p>
     </aside>
     <div class="map-topbar"><div class="view-label"><span class="crosshair">⌖</span><span>KOCHI & ITS NEIGHBOURHOODS</span></div>
       <button id="traffic-toggle" class="map-button" aria-pressed="true" disabled><span class="layers-icon" aria-hidden="true">▱</span> Traffic layer <span class="toggle-track"><span></span></span></button>
@@ -90,6 +92,16 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 map.addControl(new maplibregl.ScaleControl({ maxWidth: 80, unit: 'metric' }), 'bottom-right');
+const journey = setupJourney(map, syncRoadVisibility);
+
+function syncRoadVisibility() {
+  const exploring = element('explore-tab').getAttribute('aria-pressed') === 'true';
+  for (const id of ['selected-road-halo', 'selected-road-line']) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', exploring ? 'visible' : 'none');
+  }
+  selectedMarker?.remove();
+  if (exploring) selectedMarker = new maplibregl.Marker({ color: '#28533b' }).setLngLat(selected).addTo(map);
+}
 
 function setAlert(message = '') { alertElement.textContent = message; alertElement.hidden = !message; }
 
@@ -107,6 +119,7 @@ function drawRoad(road?: RoadDetails) {
     map.addLayer({ id: 'selected-road-line', type: 'line', source: 'selected-road',
       paint: { 'line-color': '#253e34', 'line-width': 4 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
   }
+  syncRoadVisibility();
 }
 
 function displayRoad(road: RoadDetails) {
@@ -122,8 +135,7 @@ async function selectRoad(point: [number, number], name: string, move = false) {
   selected = point; selectedName = name; latestRoad = undefined;
   drawRoad();
   if (move) map.easeTo({ center: point, zoom: Math.max(map.getZoom(), 13), duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650 });
-  selectedMarker?.remove();
-  selectedMarker = new maplibregl.Marker({ color: '#28533b' }).setLngLat(point).addTo(map);
+  syncRoadVisibility();
   element('road-heading').textContent = name;
   element('road-context').textContent = `${point[1].toFixed(4)}° N, ${point[0].toFixed(4)}° E`;
   stateElement.className = 'state-pill loading'; stateElement.textContent = 'Loading';
@@ -165,6 +177,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-place]'
   });
 }
 map.on('click', event => {
+  if (journey.consumeMapClick([event.lngLat.lng, event.lngLat.lat])) return;
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-place]')) {
     button.classList.remove('active'); button.setAttribute('aria-pressed', 'false');
   }
