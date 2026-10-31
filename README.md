@@ -2,6 +2,8 @@
 
 A fresh public, non-commercial traffic project for wider Kochi, including Kakkanad, Kalamassery, Aluva, and Tripunithura.
 
+**[Open Kochi Traffic](https://kochi-traffic.gamereviews-saimadhav10.workers.dev/)**
+
 ## Agreed scope
 
 - Live road colors, speeds, and congestion on a clean, light map.
@@ -13,12 +15,12 @@ A fresh public, non-commercial traffic project for wider Kochi, including Kakkan
 
 ## Project status
 
-The live map, traffic layer, area shortcuts, selected-road speeds, and route planner work in the local preview. Choose addresses or map points, select a car or two-wheeler, and compare available routes for departure now or in one hour. Routes include distance, duration, and departure/arrival times in IST. Optional device location is requested only when selected. Durable account-wide quotas and public deployment are the next milestones.
+The application is public on Cloudflare Workers. Choose addresses or map points, select a car or two-wheeler, and compare available routes for departure now or in one hour. Routes include distance, duration, and departure/arrival times in IST. Optional device location is requested only when selected. Durable quota enforcement is active. All 35 tests, the build, type checks, live deployment checks, and desktop/mobile browser checks pass.
 
 - [Requirements](REQUIREMENTS.md)
 - [Implementation plan](PLAN.md)
 - [Setup and verification](SETUP.md)
 
-The Cloudflare Worker adapter is included, with public provider access disabled until durable quotas are implemented. The local preview uses the same API handler under Node because this machine's local `workerd` runtime could not make outbound provider requests. Cloudflare production networking still needs verification before release.
+Public API requests reserve usage atomically in Cloudflare D1 before contacting TomTom. Daily caps, a conservative rolling window, and burst limits apply across deployed instances. If accounting is unavailable, provider requests stop. The browser receives normalized data and images; the TomTom key stays in the Worker's encrypted secrets. See [About & privacy](https://kochi-traffic.gamereviews-saimadhav10.workers.dev/about).
 
-The planned stack is TypeScript with MapLibre GL JS, TomTom maps/traffic/routing/geocoding, and Cloudflare Workers with Static Assets and D1 quota counters. A citywide future congestion map and a custom forecasting model are later work.
+The stack is TypeScript with MapLibre GL JS, TomTom maps/traffic/routing/geocoding, and Cloudflare Workers with Static Assets and D1 quota counters. A citywide future congestion map and a custom forecasting model are later work.

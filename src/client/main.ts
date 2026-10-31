@@ -47,7 +47,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <section class="legend" aria-label="Traffic colors"><span class="legend-title">TRAFFIC FLOW</span><span><i class="legend-dot clear"></i>Free flow</span><span><i class="legend-dot slower"></i>Slower</span><span><i class="legend-dot heavy"></i>Heavy</span><span class="legend-note">No overlay? No current observation.</span></section>
       <button id="refresh" class="refresh-button" aria-label="Refresh visible traffic and selected road" disabled>${refreshIcon}<span id="refresh-label">Refresh traffic</span></button>
     </div>
-    <div class="map-caption"><span id="map-status">Loading map…</span><span>Data: TomTom · Times: IST</span></div>
+    <div class="map-caption"><span id="map-status">Loading map…</span><span>Data: TomTom · Times: IST · <a href="/about">About & privacy</a></span></div>
   </main>`;
 
 function element<T extends HTMLElement = HTMLElement>(id: string): T { return document.getElementById(id) as T; }
@@ -149,6 +149,10 @@ async function selectRoad(point: [number, number], name: string, move = false) {
     if (sequence !== requestSequence) return;
     if (!response.ok) {
       const messages: Record<string, string> = {
+        RATE_LIMIT_REACHED: 'Traffic requests are arriving too quickly. Wait a moment, then refresh.',
+        VISITOR_LIMIT_REACHED: 'Please wait a minute before refreshing again.',
+        USAGE_LIMIT_REACHED: 'The shared traffic allowance or request rate has been reached. Try again later. Daily limits reset at 5:30 am IST.',
+        QUOTA_UNAVAILABLE: 'Usage accounting is temporarily unavailable. Please try again later.',
         NO_ROAD_DATA: 'No current observation is available near this point. Try a nearby road.',
         PROVIDER_BUSY: 'Traffic service is busy. Wait a moment, then refresh.',
         LOCAL_USAGE_LIMIT: 'Traffic request limit reached. Please try again later.',
@@ -191,7 +195,11 @@ map.on('style.load', () => {
   if (latestRoad) drawRoad(latestRoad);
   else void selectRoad(selected, selectedName);
 });
-map.on('error', () => { setAlert('Some map data could not load. Refresh to try again.'); statusElement.textContent = 'Map data partially unavailable'; });
+map.on('error', event => {
+  const limited = 'status' in event.error && event.error.status === 429;
+  setAlert(limited ? 'The shared traffic allowance or request rate has been reached. Please try again later.' : 'Some map data could not load. Refresh to try again.');
+  statusElement.textContent = limited ? 'Traffic service limit reached' : 'Map data partially unavailable';
+});
 
 element('traffic-toggle').addEventListener('click', () => {
   trafficEnabled = !trafficEnabled;
@@ -199,20 +207,21 @@ element('traffic-toggle').addEventListener('click', () => {
   element('traffic-toggle').setAttribute('aria-pressed', String(trafficEnabled));
 });
 
-async function refreshTraffic() {
+async function refreshTraffic(reloadBase = false) {
   if (refreshBusy || document.hidden || !mapReady) return;
   refreshBusy = true;
   const button = element<HTMLButtonElement>('refresh');
   button.disabled = true; element('refresh-label').textContent = 'Refreshing…';
   setAlert();
   const source = map.getSource<RasterTileSource>('traffic');
+  if (reloadBase) map.getSource<RasterTileSource>('basemap')?.setTiles([`${location.origin}/api/tiles/base/{z}/{x}/{y}.png?v=${Date.now()}`]);
   source?.setTiles([`${location.origin}/api/tiles/traffic/{z}/{x}/{y}.png?v=${Date.now()}`]);
   lastRefresh = Date.now();
   await selectRoad(selected, selectedName);
   statusElement.textContent = `Refresh requested ${clock(new Date(lastRefresh).toISOString())} IST`;
   button.disabled = false; element('refresh-label').textContent = 'Refresh traffic'; refreshBusy = false;
 }
-element('refresh').addEventListener('click', () => { void refreshTraffic(); });
+element('refresh').addEventListener('click', () => { void refreshTraffic(true); });
 setInterval(() => { if (Date.now() - lastRefresh >= 900_000) void refreshTraffic(); }, 30_000);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && Date.now() - lastRefresh >= 900_000) void refreshTraffic();

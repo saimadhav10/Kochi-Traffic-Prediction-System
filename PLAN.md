@@ -3,7 +3,7 @@
 Date: October 29, 2026 (Asia/Kolkata).
 Repository: [saimadhav10/Kochi-Traffic-Prediction-System](https://github.com/saimadhav10/Kochi-Traffic-Prediction-System).
 Working branch: `main`.
-Status: local configuration, provider checks, live map/road details, and route planning are implemented. Desktop and mobile preview interactions have been inspected; 23 automated tests pass. Routes support address searches, map pins, car/motorcycle modes, alternatives, and now/+1-hour estimates. The current key is absent from the browser build. Durable quotas, account-specific free allowances, provider caching permissions, and production deployment verification remain outstanding. See [SETUP.md](SETUP.md).
+Status: the application is public at [Kochi Traffic](https://kochi-traffic.gamereviews-saimadhav10.workers.dev/). Map/road details, route planning, durable quotas, privacy information, and deployment tooling are implemented. All 35 automated tests, build/type checks, public endpoint checks, an 18-request concurrent tile check, and desktop/mobile browser checks pass. The owner confirmed TomTom Free with no paid overages, a project-only key, and Workers Free on October 31, 2026; the CLI could not independently read billing subscriptions. No provider caching or observation history is enabled. See [SETUP.md](SETUP.md).
 
 ## Product flow
 
@@ -42,7 +42,7 @@ Provider caching rights and permitted cache lifetimes still need verification. D
 
 ## Free-tier usage plan
 
-Planning figures checked October 29, 2026; the new account's actual entitlements must be verified.
+Published figures rechecked October 31, 2026. The owner confirmed the free-plan settings. Conservative application limits leave room for manual testing and other account activity; provider-side quotas remain authoritative.
 
 | Service | Published free allowance | Proposed application ceiling |
 | --- | --- | --- |
@@ -53,6 +53,10 @@ Planning figures checked October 29, 2026; the new account's actual entitlements
 | TomTom geocoding | 20,000/month | 8,000/month |
 | Cloudflare Worker requests | 100,000/day | Admission ceiling below the limit, including tile proxy traffic |
 | Cloudflare D1 | 5 million rows read/day; 100,000 rows written/day; 5 GB storage | Reserve capacity for counter and index writes |
+
+The launch implementation further caps daily calls at 1,800 basemap tiles, 1,800 traffic tiles, 200 routes, 100 road observations, and 100 address searches, with an overall 4,000-call UTC-day ceiling. It checks today plus 31 preceding UTC dates against the rolling product ceilings. That conservative window covers a full 31-day billing period without depending on an unknown reset date. Provider calls from manual tools and the loopback preview are separate from deployed counters.
+
+Each admitted call reserves an anonymous per-IP minute counter, a global product burst counter, a global daily counter, and product usage in one D1 transaction. Any limit violation rolls back the batch. Failed upstream calls stay charged; there are no automatic provider retries. A tile request may retry a known rolled-back short-burst reservation at most twice, with a short wait, before its one provider call. Public requests do not share in-memory promise queues across request lifetimes. Fixed-window burst limits do not guarantee that the provider will never return a QPS rejection. Short-lived counters are removed by hourly cleanup; aggregate counts are retained for up to 33 UTC dates. No addresses, coordinates, or journeys are stored.
 
 Fetch traffic tiles for the visible map, refresh on a 15-minute cadence, and pause background refresh in hidden tabs. Query road speeds on selection and routes on explicit requests or relevant input changes. Avoid per-keystroke geocoding.
 
@@ -70,7 +74,7 @@ For illustration, 12,000 monthly routing requests supports about 6,000 compariso
 | 4. Quotas and failure handling | 1–2 hours | Durable budget enforcement, burst control, bounded retries, timeouts, hidden-tab behavior, graceful errors |
 | 5. Verification and public deployment | 1–2 hours | Relevant automated checks and visual/mobile review pass; deployed URL passes smoke checks |
 
-Estimated total: 7–12 focused hours plus account/setup delays. The October 30 target is conditional on these checks. Clarify material scope changes before implementing them.
+The original October 30 target has passed. Release follows successful production checks, without a new date promise. Clarify material scope changes before implementing them.
 
 Earlier sample checks demonstrated technical provider capabilities, but the reset does not carry forward code, datasets, models, credentials, or completed-milestone claims. Verify the project-owned key and current configuration in the fresh implementation.
 

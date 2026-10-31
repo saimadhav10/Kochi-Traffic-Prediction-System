@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>About & privacy — Kochi Traffic</title>
+    <link rel="icon" href="/favicon.svg" />
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        background: #f5f7f1;
+        color: #24372c;
+        line-height: 1.7;
+        margin: 0;
+        padding: 28px;
+      }
+      main {
+        max-width: 680px;
+        margin: 30px auto;
+      }
+      a {
+        color: #28553e;
+      }
+      h1 {
+        line-height: 1.2;
+      }
+      h2 {
+        font-size: 20px;
+        margin-top: 30px;
+      }
+      p {
+        color: #52604c;
+      }
+      a:focus-visible {
+        outline: 3px solid #739845;
+        outline-offset: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="/">← Back to the map</a>
+      <h1>A clearer view of Kochi.</h1>
+      <p>
+        Kochi Traffic is a public, non-commercial project covering the wider
+        Kochi urban area, including Kakkanad, Kalamassery, Aluva, and
+        Tripunithura.
+      </p>
+      <h2>Traffic and journey estimates</h2>
+      <p>
+        Maps, traffic observations, address searches, and routes come from
+        TomTom. The traffic layer refreshes every 15 minutes while the page is
+        visible. A fetch time records when this app acquired data, rather than
+        when every vehicle was observed. Missing data does not mean an empty
+        road.
+      </p>
+      <p>
+        Current speed is an average for an observed road segment. Free-flow
+        speed describes expected uncongested conditions and is not the legal
+        speed limit. Journey times for leaving now or in one hour are provider
+        estimates and can change. Two-wheeler routing uses TomTom's experimental
+        motorcycle mode; restriction coverage can be incomplete. Follow road
+        signs and local rules.
+      </p>
+      <h2>Your data</h2>
+      <p>
+        There are no user accounts, ads, or saved trip histories. Address
+        searches and selected trip coordinates are sent through our Cloudflare
+        server to TomTom to answer your request. Map requests identify the area
+        being viewed. Device location is optional, requested only after you
+        choose “Use my location,” and can be denied in your browser.
+      </p>
+      <p>
+        The application database stores aggregate request counts and short-lived
+        rate-limit counters. Visitor counters use a secret-salted identifier
+        that changes daily; raw IP addresses, addresses, and journey coordinates
+        are not stored in that database. Short-lived identifiers are removed by
+        hourly cleanup. Aggregate counts are retained for up to 33 UTC dates.
+        Cloudflare and TomTom process requests under their own privacy policies.
+      </p>
+      <h2>Free public access</h2>
+      <p>
+        Shared usage limits keep the project within free allowances. If a limit
+        is reached or accounting is unavailable, requests stop instead of
+        bypassing the limits. Daily application limits reset at 5:30 am IST.
+        Other limits can take longer to clear.
+      </p>
+      <p>
+        <a href="https://www.tomtom.com/privacy/" rel="noopener noreferrer"
+          >TomTom privacy</a
+        >
+        ·
+        <a
+          href="https://www.cloudflare.com/privacypolicy/"
+          rel="noopener noreferrer"
+          >Cloudflare privacy</a
+        >
+        ·
+        <a
+          href="https://www.tomtom.com/legal/en_gb/product-attributions/"
+          rel="noopener noreferrer"
+          >Map attribution</a
+        >
+        ·
+        <a
+          href="https://github.com/saimadhav10/Kochi-Traffic-Prediction-System"
+          rel="noopener noreferrer"
+          >Project source</a
+        >
+      </p>
+    </main>
+  </body>
+</html>

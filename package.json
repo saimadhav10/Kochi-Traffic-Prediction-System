@@ -9,13 +9,16 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "verify:provider": "node scripts/verify-provider.mjs",
-    "test": "node --experimental-strip-types --test",
+    "verify:deployment": "node scripts/verify-deployment.mjs",
+    "test": "node --experimental-sqlite --experimental-strip-types --test",
     "dev": "node --experimental-strip-types scripts/dev.mjs",
     "dev:worker": "node scripts/worker.mjs",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "cloudflare:login": "node scripts/cloudflare.mjs login",
-    "cloudflare:status": "node scripts/cloudflare.mjs whoami"
+    "cloudflare:status": "node scripts/cloudflare.mjs whoami",
+    "cloudflare:migrate": "node scripts/cloudflare.mjs migrate",
+    "deploy": "node scripts/deploy.mjs"
   },
   "devDependencies": {
     "typescript": "7.0.2",

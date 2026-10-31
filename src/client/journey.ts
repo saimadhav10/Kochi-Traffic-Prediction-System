@@ -43,6 +43,10 @@ const clock = (iso: string) =>
 const minutes = (seconds: number) =>
   `${Math.max(1, Math.round(seconds / 60))} min`;
 const errors: Record<string, string> = {
+  RATE_LIMIT_REACHED: 'Traffic requests are arriving too quickly. Wait a moment, then try again.',
+  VISITOR_LIMIT_REACHED: 'Please wait a minute before making more requests.',
+  USAGE_LIMIT_REACHED: 'The shared traffic allowance or request rate has been reached. Try again later. Daily limits reset at 5:30 am IST.',
+  QUOTA_UNAVAILABLE: 'Usage accounting is temporarily unavailable. Please try again later.',
   NO_ROUTE: "No drivable route was found for these points. Try a nearby road.",
   VEHICLE_UNAVAILABLE:
     "The provider could not confirm this vehicle mode along the route. Try different points.",

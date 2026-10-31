@@ -1,11 +1,15 @@
 import { bounds, containsPoint, validTile, type RoadDetails } from '../shared/region.ts';
 import { normalizeAddresses, normalizeRoutes } from './journey.ts';
+import { anonymousIdentity, QuotaError, reserveQuota, type Product, type QuotaDatabase } from './quota.ts';
 
 export interface Env {
   TOMTOM_API_KEY?: string;
+  QUOTA_DB?: QuotaDatabase;
+  QUOTA_SALT?: string;
+  PUBLIC_ACCESS_ENABLED?: string;
+  requestIdentity?: string;
   ASSETS: { fetch(request: Request): Promise<Response> };
 }
-type Product = 'base' | 'traffic' | 'flow' | 'geocode' | 'route';
 type Fetcher = typeof fetch;
 
 const guards = new Map<Product, { tail: Promise<void>; lastStart: number; calls: number; queued: number }>();
@@ -18,16 +22,16 @@ export class ApiError extends Error {
   constructor(code: string, status: number) { super(code); this.code = code; this.status = status; }
 }
 
-const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' };
+const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cross-Origin-Resource-Policy': 'same-origin' };
 function json(body: unknown, status = 200): Response {
-  return Response.json(body, { status, headers });
+  return Response.json(body, { status, headers: { ...headers, ...(status === 429 ? { 'Retry-After': '60' } : {}) } });
 }
 
-async function guardedRequest(product: Product, operation: () => Promise<Response>): Promise<Response> {
+async function guardedRequest(product: Product, operation: () => Promise<Response>, local = true): Promise<Response> {
   let guard = guards.get(product);
   if (!guard) { guard = { tail: Promise.resolve(), lastStart: 0, calls: 0, queued: 0 }; guards.set(product, guard); }
-  if (guard.calls >= limits[product] || guard.queued >= 40) throw new ApiError('LOCAL_USAGE_LIMIT', 429);
-  guard.calls++;
+  if ((local && guard.calls >= limits[product]) || guard.queued >= 40) throw new ApiError(local ? 'LOCAL_USAGE_LIMIT' : 'USAGE_LIMIT_REACHED', 429);
+  if (local) guard.calls++;
   guard.queued++;
   const previous = guard.tail;
   let release!: () => void;
@@ -44,10 +48,25 @@ async function guardedRequest(product: Product, operation: () => Promise<Respons
 async function provider(path: string, params: Record<string, string>, product: Product, env: Env, fetcher: Fetcher) {
   const url = new URL(path, 'https://api.tomtom.com');
   url.search = new URLSearchParams({ ...params, key: env.TOMTOM_API_KEY!.trim() }).toString();
-  return guardedRequest(product, async () => {
-    try { return await fetcher(url, { redirect: 'error', signal: AbortSignal.timeout(12_000) }); }
+  const operation = async () => {
+    if (env.requestIdentity && env.QUOTA_DB) {
+      for (let attempt = 0; ; attempt++) {
+        try { await reserveQuota(env.QUOTA_DB, product, env.requestIdentity); break; }
+        catch (error) {
+          // Retry only a known rolled-back short burst, never a provider call or uncertain write.
+          if (!(error instanceof QuotaError) || error.code !== 'RATE_LIMIT_REACHED' || !['base', 'traffic'].includes(product) || attempt >= 2) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1050 + Math.random() * 150));
+        }
+      }
+    }
+    // Workers supports manual/follow, but not the standard error redirect mode.
+    // Keep redirects disabled and reject 3xx in checkProviderStatus without following Location.
+    try { return await fetcher(url, { redirect: 'manual', signal: AbortSignal.timeout(12_000) }); }
     catch { throw new ApiError('PROVIDER_NETWORK_ERROR', 503); }
-  });
+  };
+  // Never keep cross-request promise queues in a Worker isolate: an aborted
+  // request can terminate its I/O and strand other requests waiting on it.
+  return env.requestIdentity ? operation() : guardedRequest(product, operation);
 }
 
 function checkProviderStatus(response: Response): void {
@@ -115,11 +134,14 @@ export async function handleApi(request: Request, env: Env, fetcher: Fetcher = f
     const url = new URL(request.url);
     if (request.method !== 'GET') return json({ error: 'METHOD_NOT_ALLOWED' }, 405);
     const localAccess = localPreview && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-    if (url.pathname === '/api/status') return json({ available: localAccess && Boolean(env.TOMTOM_API_KEY?.trim()), refreshMinutes: 15 });
-    // Until durable account-wide quotas are implemented, upstream access is local only.
-    // A deployment cannot accidentally expose an unrestricted public provider proxy.
-    if (!localAccess) throw new ApiError('PUBLIC_ACCESS_NOT_READY', 503);
+    const publicAccess = !localPreview && url.protocol === 'https:' && env.PUBLIC_ACCESS_ENABLED === 'true' && Boolean(env.QUOTA_DB && env.QUOTA_SALT && env.QUOTA_SALT.length >= 32);
+    if (url.pathname === '/api/status') return json({ available: (localAccess || publicAccess) && Boolean(env.TOMTOM_API_KEY?.trim()), refreshMinutes: 15 });
+    if (!localAccess && !publicAccess) throw new ApiError('PUBLIC_ACCESS_NOT_READY', 503);
     if (!env.TOMTOM_API_KEY?.trim()) throw new ApiError('TRAFFIC_UNAVAILABLE', 503);
+    if (publicAccess) {
+      if ((request.headers.get('origin') && request.headers.get('origin') !== url.origin) || request.headers.get('sec-fetch-site') === 'cross-site') throw new ApiError('INVALID_ORIGIN', 403);
+      env = { ...env, requestIdentity: await anonymousIdentity(request.headers.get('cf-connecting-ip'), env.QUOTA_SALT!, new Date()) };
+    } else env = { ...env, requestIdentity: undefined };
 
     if (url.pathname === '/api/geocode') {
       validateParams(url, ['q']);
@@ -156,7 +178,7 @@ export async function handleApi(request: Request, env: Env, fetcher: Fetcher = f
     }
 
     if (url.pathname === '/api/flow') {
-      if ([...url.searchParams.keys()].some(name => !['lat', 'lon'].includes(name))) throw new ApiError('INVALID_REQUEST', 400);
+      validateParams(url, ['lat', 'lon']);
       const lat = Number(url.searchParams.get('lat')), lon = Number(url.searchParams.get('lon'));
       if (!url.searchParams.has('lat') || !url.searchParams.has('lon') || !containsPoint(lat, lon)) throw new ApiError('OUTSIDE_KOCHI', 400);
       const response = await provider('/traffic/services/4/flowSegmentData/relative0/16/json', {
@@ -169,7 +191,7 @@ export async function handleApi(request: Request, env: Env, fetcher: Fetcher = f
 
     const match = /^\/api\/tiles\/(base|traffic)\/(\d{1,2})\/(\d+)\/(\d+)\.png$/.exec(url.pathname);
     if (match) {
-      if ([...url.searchParams.keys()].some(name => name !== 'v')) throw new ApiError('INVALID_REQUEST', 400);
+      validateParams(url, ['v']);
       const product = match[1] as 'base' | 'traffic';
       const z = Number(match[2]), x = Number(match[3]), y = Number(match[4]);
       if (!validTile(z, x, y)) throw new ApiError('OUTSIDE_KOCHI', 400);
@@ -185,7 +207,7 @@ export async function handleApi(request: Request, env: Env, fetcher: Fetcher = f
     }
     return json({ error: 'NOT_FOUND' }, 404);
   } catch (error) {
-    return json({ error: error instanceof ApiError ? error.code : 'TRAFFIC_UNAVAILABLE' },
-      error instanceof ApiError ? error.status : 503);
+    return json({ error: error instanceof ApiError || error instanceof QuotaError ? error.code : 'TRAFFIC_UNAVAILABLE' },
+      error instanceof ApiError || error instanceof QuotaError ? error.status : 503);
   }
 }

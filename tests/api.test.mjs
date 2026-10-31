@@ -32,7 +32,7 @@ test('road normalization preserves a genuine zero speed and closure without leak
   const response = await handleApi(local('/api/flow?lat=9.98&lon=76.30'), env, async (url, options) => {
     assert.equal(url.origin, 'https://api.tomtom.com');
     assert.equal(url.searchParams.get('key'), secret);
-    assert.equal(options.redirect, 'error');
+    assert.equal(options.redirect, 'manual');
     return Response.json(flow);
   }, true);
   assert.equal(response.status, 200);
@@ -64,4 +64,16 @@ test('a localhost Host value cannot enable provider access in the production ada
   });
   assert.equal(response.status, 503);
   assert.equal(called, false);
+});
+
+test('the Worker-compatible fetch adapter does not follow or expose upstream redirects', async () => {
+  let calls = 0;
+  const response = await handleApi(local('/api/flow?lat=9.98&lon=76.30'), env, async (_url, options) => {
+    calls++;
+    assert.equal(options.redirect, 'manual');
+    return new Response(secret, { status: 302, headers: { Location: `https://other.example/?key=${secret}` } });
+  }, true);
+  assert.equal(calls, 1); assert.equal(response.status, 503);
+  assert.equal(response.headers.get('location'), null);
+  assert.deepEqual(await response.json(), { error: 'PROVIDER_HTTP_302' });
 });

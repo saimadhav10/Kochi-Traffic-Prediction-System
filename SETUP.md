@@ -1,6 +1,8 @@
 # Configuration and provider access
 
-Checked October 29, 2026. Local configuration, Cloudflare CLI authentication, and technical TomTom capability checks are working. Account-specific free allowances and billing/overage settings still require confirmation in the account dashboards.
+Updated October 31, 2026. Local configuration, Cloudflare authentication, provider checks, and durable quotas are working. The owner confirmed TomTom Free with no paid overages and a project-only key, plus Workers Free. These are owner confirmations; the CLI's OAuth token cannot read account billing subscriptions.
+
+Public application: **[Kochi Traffic](https://kochi-traffic.gamereviews-saimadhav10.workers.dev/)**. Production traffic, geocoding, both vehicle modes, now/+1-hour routing, map images, credential boundaries, and D1 reservations were verified. Desktop/mobile browser interactions and an 18-request concurrent tile check passed.
 
 ## Live map preview
 
@@ -15,9 +17,9 @@ Open `http://127.0.0.1:8787`. The light map includes current traffic colors, fiv
 
 The Node preview binds only to `127.0.0.1` and calls the same Web-standard API handler used by the Cloudflare Worker adapter. Only the server reads `.env`; the browser calls restricted `/api/tiles/...` and `/api/flow` endpoints on the same origin. Requests outside the operating bounds, unexpected parameters, arbitrary proxy targets, invalid tiles, and non-GET API methods are rejected. Provider response fields and error bodies are not passed through wholesale. Browser responses contain no credentials.
 
-Provider access is explicitly disabled in the production adapter until durable account-wide quotas exist; changing a Host header cannot enable it. The Node preview grants local access explicitly and has conservative per-process request and queue ceilings. These local ceilings are not production quota enforcement.
+Public provider access requires the explicit enable flag, a D1 binding, and both server secrets. Every actual provider call is preceded by an atomic D1 reservation. Changing a Host header cannot grant loopback-preview access. The Node preview grants local access explicitly and retains conservative process-local ceilings; its development calls and standalone provider checks are not recorded in production D1 usage.
 
-The local Cloudflare `workerd` runtime rejected outbound provider fetches on this machine while Node's verified HTTPS requests succeeded. No certificate checks were disabled. Use `npm run dev:worker` to investigate the Cloudflare runtime separately after building; it does not enable upstream access. The Node preview supports UI verification, but Cloudflare production networking must still be tested before release.
+The original Cloudflare fetch failure was caused by unsupported `redirect: 'error'`. The shared adapter now uses `manual` and rejects redirect responses without following their Location or forwarding their headers/body. Production networking passes. The Node preview remains convenient for local development. `dev:worker` does not grant loopback provider access automatically; do not use it as a substitute for the Node preview without local D1/configuration work.
 
 MapLibre's rendering worker is bundled as a same-origin asset, and the page's content security policy restricts connections and scripts to this application. The production build emits a MapLibre bundle-size advisory (about 297 kB gzip for the main JavaScript bundle); the build succeeds.
 
@@ -43,7 +45,7 @@ rtk proxy npm.cmd run cloudflare:status
 
 Complete the login and consent in your own browser. The CLI stores its authentication in the user's Wrangler configuration outside this repository. The project commands disable Wrangler usage metrics. Do not copy that authentication file or its contents into the project or chat.
 
-Cloudflare authentication was confirmed with Workers and D1 access. No public application, paid resource, or deployment was created during this setup step. Dashboard verification of the account's free plan remains outstanding.
+Cloudflare authentication was confirmed with Workers and D1 access. The owner confirmed Workers Free. A dedicated `kochi-traffic-quotas` D1 database was created in APAC and its quota migration applied. Other applications and databases in the account were left untouched.
 
 ## Verification
 
@@ -62,7 +64,7 @@ The normalized report is written to ignored `provider-check.local.json`. It reco
 
 | Check | Result |
 | --- | --- |
-| Configuration, provider, server-boundary, and journey tests | 23 passed |
+| Configuration, provider, server-boundary, journey, and SQLite quota tests | 35 passed |
 | Traffic samples: central Kochi, Kakkanad, Kalamassery, Aluva, Tripunithura | 5 passed |
 | Basemap and traffic raster tiles | 2 passed |
 | Kochi address geocoding | Passed |
@@ -80,11 +82,21 @@ The first concurrent live check encountered two HTTP 429 routing responses. The 
 
 The current credential is kept in a local file rather than source or browser code. This scan does not assess account usage outside this project or guarantee that a credential can never be exposed.
 
-## Remaining checks before public deployment
+## Operating the public deployment
 
-- Confirm actual TomTom product allowances, request charging, reset cycle, and billing/overage behavior, and confirm Cloudflare Workers Free access.
-- Check provider caching permissions before enabling caching or retaining historical observations.
-- Add durable quota enforcement and deployment checks from [PLAN.md](PLAN.md). Map, selected-road details, and routing are implemented locally.
+- Recheck the deployment with `rtk proxy npm.cmd run verify:deployment` after changes. This consumes up to 12 TomTom requests plus ordinary static asset requests; do not run it continuously.
+- Keep provider responses uncached. Verify permissions before introducing provider-data caching or observation history.
+- Monitor shared free allowances. The application does not upgrade plans or enable paid overages.
+
+## Cloudflare publication
+
+Build, type-check, and test before deploying. Run `rtk proxy npm.cmd run cloudflare:migrate` for the project's remote D1 migrations and `rtk proxy npm.cmd run deploy` to publish the Worker and built static assets.
+
+The deploy tool reads the ignored `.env`, generates a `QUOTA_SALT` there once if missing, scans browser assets for both secrets, and uploads the TomTom key and salt to **this account's Cloudflare Worker encrypted secrets storage**. It uses a temporary JSON secrets file rather than command-line secret values and removes that file afterward. It does not send credentials to GitHub or browser assets. Existing quota usage survives deployments. Set `PUBLIC_ACCESS_ENABLED` to `false` and redeploy to disable public provider access without resetting counters.
+
+Daily ceilings are 1,800 basemap tiles, 1,800 traffic tiles, 200 routes, 100 road observations, and 100 geocodes, capped at 4,000 total upstream attempts. Daily windows reset at 00:00 UTC (05:30 IST). A conservative 32-date rolling window checks the product ceilings in [PLAN.md](PLAN.md). D1 reservation failures stop provider access. Failed upstream calls still count and are not automatically retried. Only known rolled-back short tile-burst reservations may be retried, at most twice, before one provider call. Visitor/daily/rolling limits and uncertain failures are never retried automatically. The manual refresh control reloads visible basemap/traffic tiles and the selected road; the 15-minute automatic refresh leaves basemap tiles alone. Counter cleanup runs hourly at minute 17.
+
+The automated quota suite executes the production SQL against SQLite and verifies boundary concurrency, transaction rollback, rolling dates, per-IP/global bursts, failure handling, and identity rotation. Node's SQLite implementation emits an experimental warning during tests. This is a development test dependency; the deployed Worker uses Cloudflare D1.
 
 ## Using the route planner
 
