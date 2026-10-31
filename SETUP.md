@@ -2,7 +2,7 @@
 
 Updated October 31, 2026. Local configuration, Cloudflare authentication, provider checks, and durable quotas are working. The owner confirmed TomTom Free with no paid overages and a project-only key, plus Workers Free. These are owner confirmations; the CLI's OAuth token cannot read account billing subscriptions.
 
-Public application: **[Kochi Traffic](https://kochi-traffic.gamereviews-saimadhav10.workers.dev/)**. Production traffic, geocoding, both vehicle modes, now/+1-hour routing, map images, credential boundaries, and D1 reservations were verified. Desktop/mobile browser interactions and an 18-request concurrent tile check passed.
+Public application: **[Kochi Traffic](https://kochi-traffic.saimadhav.workers.dev/)**. Production traffic, geocoding, both vehicle modes, now/+1-hour routing, map images, credential boundaries, and D1 reservations were verified. Desktop/mobile browser interactions and an 18-request concurrent tile check passed.
 
 ## Live map preview
 

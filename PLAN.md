@@ -3,7 +3,7 @@
 Date: October 29, 2026 (Asia/Kolkata).
 Repository: [saimadhav10/Kochi-Traffic-Prediction-System](https://github.com/saimadhav10/Kochi-Traffic-Prediction-System).
 Working branch: `main`.
-Status: the application is public at [Kochi Traffic](https://kochi-traffic.gamereviews-saimadhav10.workers.dev/). Map/road details, route planning, durable quotas, privacy information, and deployment tooling are implemented. All 35 automated tests, build/type checks, public endpoint checks, an 18-request concurrent tile check, and desktop/mobile browser checks pass. The owner confirmed TomTom Free with no paid overages, a project-only key, and Workers Free on October 31, 2026; the CLI could not independently read billing subscriptions. No provider caching or observation history is enabled. See [SETUP.md](SETUP.md).
+Status: the application is public at [Kochi Traffic](https://kochi-traffic.saimadhav.workers.dev/). Map/road details, route planning, durable quotas, privacy information, and deployment tooling are implemented. All 35 automated tests, build/type checks, public endpoint checks, an 18-request concurrent tile check, and desktop/mobile browser checks pass. The owner confirmed TomTom Free with no paid overages, a project-only key, and Workers Free on October 31, 2026; the CLI could not independently read billing subscriptions. No provider caching or observation history is enabled. See [SETUP.md](SETUP.md).
 
 ## Product flow
 

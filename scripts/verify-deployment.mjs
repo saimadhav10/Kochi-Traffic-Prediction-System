@@ -1,5 +1,5 @@
 import { loadSettings } from "./environment.mjs";
-const origin = "https://kochi-traffic.gamereviews-saimadhav10.workers.dev";
+const origin = "https://kochi-traffic.saimadhav.workers.dev";
 const settings = loadSettings();
 const secrets = [settings.TOMTOM_API_KEY, settings.QUOTA_SALT].filter(Boolean);
 const pause = () => new Promise((resolve) => setTimeout(resolve, 1150));
